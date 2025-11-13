@@ -10,5 +10,5 @@ import lombok.NoArgsConstructor;
 public class VenueDTO {
     private String name;
     private String location;
-    private int capacity;
+    private Integer capacity;
 }

@@ -2,51 +2,73 @@ package com.riwi.H1.service;
 
 import com.riwi.H1.dto.VenueDTO;
 import com.riwi.H1.model.Venue;
-import com.riwi.H1.service.VenueService;
+import com.riwi.H1.repository.VenueRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
 public class VenueServiceImpl implements VenueService {
 
-    private final List<Venue> venues = new ArrayList<>();
-    private Long nextId = 1L;
+    private final VenueRepository venueRepository;
+
+    public VenueServiceImpl(VenueRepository venueRepository) {
+        this.venueRepository = venueRepository;
+    }
 
     @Override
     public List<Venue> getAll() {
-        return venues;
+        return venueRepository.findAll();
     }
 
     @Override
     public Venue getById(Long id) {
-        return venues.stream()
-                .filter(v -> v.getId().equals(id))
-                .findFirst()
-                .orElse(null);
-    }
-
-    @Override
-    public Venue create(VenueDTO venueDTO) {
-        Venue venue = new Venue(nextId++, venueDTO.getName(), venueDTO.getLocation(), venueDTO.getCapacity());
-        venues.add(venue);
+        Venue venue = venueRepository.findById(id);
+        if (venue == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Venue no encontrado");
+        }
         return venue;
     }
 
     @Override
-    public Venue update(Long id, VenueDTO venueDTO) {
-        Venue existing = getById(id);
-        if (existing != null) {
-            existing.setName(venueDTO.getName());
-            existing.setLocation(venueDTO.getLocation());
-            existing.setCapacity(venueDTO.getCapacity());
+    public Venue create(VenueDTO venueDTO) {
+        if (venueDTO.getName() == null || venueDTO.getName().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nombre del venue es obligatorio");
         }
-        return existing;
+        if (venueDTO.getLocation() == null || venueDTO.getLocation().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La ubicación del venue es obligatoria");
+        }
+        if (venueDTO.getCapacity() == null || venueDTO.getCapacity() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La capacidad debe ser un número positivo");
+        }
+
+        Venue venue = new Venue(null, venueDTO.getName(), venueDTO.getLocation(), venueDTO.getCapacity());
+        return venueRepository.save(venue);
+    }
+
+    @Override
+    public Venue update(Long id, VenueDTO venueDTO) {
+        Venue existing = venueRepository.findById(id);
+        if (existing == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Venue no encontrado");
+        }
+
+        if (venueDTO.getName() == null || venueDTO.getName().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nombre del venue es obligatorio");
+        }
+
+        Venue updated = new Venue(id, venueDTO.getName(), venueDTO.getLocation(), venueDTO.getCapacity());
+        return venueRepository.update(id, updated);
     }
 
     @Override
     public void delete(Long id) {
-        venues.removeIf(v -> v.getId().equals(id));
+        Venue existing = venueRepository.findById(id);
+        if (existing == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Venue no encontrado");
+        }
+        venueRepository.delete(id);
     }
 }
