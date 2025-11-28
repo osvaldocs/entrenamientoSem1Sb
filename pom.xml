@@ -12,7 +12,11 @@
 	<artifactId>demo</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>demo</name>
+<<<<<<< HEAD
 	<description>HU4 Riwi</description>
+=======
+	<description>HU3 Riwi</description>
+>>>>>>> origin/main
 	<url/>
 	<licenses>
 		<license/>
@@ -75,10 +79,13 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>2.1.0</version> <!-- revisá la última versión -->
         </dependency>
+<<<<<<< HEAD
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
         </dependency>
+=======
+>>>>>>> origin/main
 	</dependencies>
 
 	<build>

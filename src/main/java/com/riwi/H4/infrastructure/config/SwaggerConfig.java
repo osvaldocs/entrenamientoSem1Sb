@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:src/main/java/com/riwi/H4/infrastructure/config/SwaggerConfig.java
 package com.riwi.H4.infrastructure.config;
+========
+package com.riwi.H3.infrastructure.config;
+>>>>>>>> origin/main:src/main/java/com/riwi/H3/infrastructure/config/SwaggerConfig.java
 
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.OpenAPI;
