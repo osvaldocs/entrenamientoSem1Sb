@@ -3,26 +3,41 @@ package com.riwi.H4.infrastructure.dto;
 import java.time.LocalDate;
 
 import com.riwi.H4.domain.model.EventStatus;
+import com.riwi.H4.infrastructure.validation.ValidationGroups;
 
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Null;
+import jakarta.validation.constraints.Size;
 
+/**
+ * Event Data Transfer Object
+ * 
+ * Includes advanced Bean Validation with validation groups
+ * for different operation types (Create vs Update)
+ * 
+ * HU5 - TASK 1: Advanced Validations
+ */
 public class EventDTO {
 
+    // ID should be null on Create, but not null on Update
+    @Null(groups = ValidationGroups.Create.class, message = "ID debe ser nulo al crear un evento")
+    @NotNull(groups = ValidationGroups.Update.class, message = "ID es obligatorio al actualizar un evento")
     private Long id;
 
-    @NotBlank(message = "El nombre del evento es obligatorio")
+    @NotBlank(message = "{event.name.notblank}")
+    @Size(min = 3, max = 100, message = "{event.name.size}")
     private String name;
 
-    @NotNull(message = "La fecha del evento es obligatoria")
-    @Future(message = "La fecha del evento debe ser futura")
+    @NotNull(message = "{event.date.notnull}")
+    @Future(message = "{event.date.future}")
     private LocalDate date;
 
     @NotNull(message = "El estado del evento es obligatorio")
     private EventStatus status; // ACTIVE or CANCELLED
 
-    @NotNull(message = "El venue es obligatorio")
+    @NotNull(message = "{event.venue.notnull}")
     private Long venueId; // Solo el ID del venue
 
     public EventDTO() {

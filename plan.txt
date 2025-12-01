@@ -1,0 +1,634 @@
+═══════════════════════════════════════════════════════════════════════════════
+PLAN DE IMPLEMENTACIÓN HU5
+Gestión Estándar de Errores y Seguridad JWT
+═══════════════════════════════════════════════════════════════════════════════
+
+OBJETIVO: Implementar manejo de errores estandarizado (RFC 7807) y seguridad JWT 
+con control de acceso por rol en la arquitectura hexagonal existente.
+
+Story Points: 10
+
+═══════════════════════════════════════════════════════════════════════════════
+FASE 0: PREPARACIÓN Y CONFIGURACIÓN INICIAL
+═══════════════════════════════════════════════════════════════════════════════
+
+0.1. RESOLVER CONFLICTOS DE MERGE EN pom.xml
+    Archivo: pom.xml
+    Acción: MODIFICAR
+    Justificación: Hay conflictos de merge entre HEAD y origin/main que impiden
+                   la compilación del proyecto. Necesario resolverlos antes de
+                   agregar nuevas dependencias.
+    Cambios:
+    - Eliminar marcadores de conflicto (<<<<<<<, =======, >>>>>>>)
+    - Mantener descripción de HU4 (versión HEAD)
+    - Conservar dependencias de Flyway
+    - Asegurar que el proyecto compile correctamente
+
+0.2. AGREGAR DEPENDENCIAS DE SEGURIDAD JWT
+    Archivo: pom.xml
+    Acción: MODIFICAR
+    Justificación: Spring Security y JWT son necesarios para implementar
+                   autenticación stateless y control de acceso por rol (TASK 3).
+    Dependencias a agregar:
+    - spring-boot-starter-security: Framework de seguridad
+    - jjwt-api, jjwt-impl, jjwt-jackson: Librería JWT para generación/validación
+    - spring-security-test: Testing de endpoints seguros
+
+0.3. ACTUALIZAR application.properties
+    Archivo: src/main/resources/application.properties
+    Acción: MODIFICAR
+    Justificación: Configurar propiedades JWT, resolver conflictos de merge,
+                   y habilitar logging estructurado (TASK 2).
+    Cambios:
+    - Resolver conflictos entre HEAD (HU4) y origin/main
+    - Mantener configuración de Flyway y batch fetching (HU4)
+    - Agregar propiedades JWT: secret key, expiration time, issuer
+    - Configurar logging estructurado con patrones que incluyan timestamp y traceId
+    - Configurar niveles de log para seguridad (autenticación fallida)
+
+0.4. CREAR messages.properties
+    Archivo: src/main/resources/messages.properties
+    Acción: CREAR
+    Justificación: Centralizar mensajes de validación personalizados (TASK 1).
+                   Facilita internacionalización y mantenimiento.
+    Contenido:
+    - Mensajes de validación para Event (name, date, venue)
+    - Mensajes de validación para Venue (name, location, capacity)
+    - Mensajes de validación cruzada (fechaInicio < fechaFin)
+    - Mensajes de error de autenticación/autorización
+
+═══════════════════════════════════════════════════════════════════════════════
+FASE 1: VALIDACIONES AVANZADAS Y ESQUEMA DE ERRORES UNIFORME (TASK 1)
+═══════════════════════════════════════════════════════════════════════════════
+
+1.1. CREAR CLASE ErrorResponse (RFC 7807)
+    Archivo: src/main/java/com/riwi/H4/infrastructure/dto/ErrorResponse.java
+    Acción: CREAR
+    Justificación: Implementar ProblemDetail (RFC 7807) como formato estándar
+                   de respuesta de errores. Mejora la trazabilidad y debugging.
+    Estructura:
+    - type: URI del tipo de error
+    - title: Título breve del error
+    - status: Código HTTP
+    - detail: Descripción detallada
+    - instance: URI de la petición que causó el error
+    - timestamp: ZonedDateTime del error
+    - traceId: UUID único para correlacionar con logs
+
+1.2. CREAR GlobalExceptionHandler
+    Archivo: src/main/java/com/riwi/H4/infrastructure/exception/GlobalExceptionHandler.java
+    Acción: CREAR
+    Justificación: Centralizar manejo de excepciones con @ControllerAdvice para
+                   garantizar respuestas uniformes (TASK 1).
+    Excepciones a manejar:
+    - MethodArgumentNotValidException: Errores de validación Bean Validation
+    - NotFoundException: Entidades no encontradas (404)
+    - DataIntegrityViolationException: Violaciones de integridad DB (409)
+    - IllegalArgumentException: Argumentos inválidos (400)
+    - Exception: Errores genéricos (500)
+    - AccessDeniedException: Acceso denegado (403)
+    - AuthenticationException: Autenticación fallida (401)
+    
+    Funcionalidad adicional:
+    - Generar traceId único para cada error
+    - Registrar en logs con nivel apropiado (WARN/ERROR)
+    - Construir ErrorResponse siguiendo RFC 7807
+
+1.3. CREAR GRUPOS DE VALIDACIÓN
+    Archivo: src/main/java/com/riwi/H4/infrastructure/validation/ValidationGroups.java
+    Acción: CREAR
+    Justificación: Permitir validaciones diferentes para Create vs Update (TASK 1).
+                   Por ejemplo, ID no requerido en Create pero sí en Update.
+    Interfaces:
+    - Create: Grupo para operaciones de creación
+    - Update: Grupo para operaciones de actualización
+
+1.4. AGREGAR VALIDACIONES CRUZADAS EN EventDTO
+    Archivo: src/main/java/com/riwi/H4/infrastructure/dto/EventDTO.java
+    Acción: MODIFICAR
+    Justificación: Implementar validaciones avanzadas con Bean Validation (TASK 1).
+    Cambios:
+    - Agregar @NotNull, @NotBlank, @Size con mensajes de messages.properties
+    - Agregar grupos de validación (Create, Update)
+    - Si hay fechaInicio y fechaFin, crear anotación custom @ValidDateRange
+
+1.5. AGREGAR VALIDACIONES EN VenueDTO
+    Archivo: src/main/java/com/riwi/H4/infrastructure/dto/VenueDTO.java
+    Acción: MODIFICAR
+    Justificación: Implementar validaciones con mensajes personalizados (TASK 1).
+    Cambios:
+    - @NotNull, @NotBlank en campos obligatorios
+    - @Min, @Max para capacity
+    - Grupos de validación
+    - Mensajes desde messages.properties
+
+1.6. CREAR ANOTACIÓN CUSTOM @ValidDateRange (SI APLICA)
+    Archivos:
+    - src/main/java/com/riwi/H4/infrastructure/validation/ValidDateRange.java
+    - src/main/java/com/riwi/H4/infrastructure/validation/DateRangeValidator.java
+    Acción: CREAR (CONDICIONAL)
+    Justificación: Validación cruzada para asegurar que fechaInicio < fechaFin (TASK 1).
+    Nota: Solo crear si EventDTO tiene ambos campos de fecha.
+
+1.7. ACTUALIZAR CONTROLADORES CON @Validated
+    Archivos:
+    - src/main/java/com/riwi/H4/infrastructure/controller/EventController.java
+    - src/main/java/com/riwi/H4/infrastructure/controller/VenueController.java
+    Acción: MODIFICAR
+    Justificación: Activar validaciones por grupo en endpoints (TASK 1).
+    Cambios:
+    - Agregar @Validated en la clase del controlador
+    - En métodos POST (create): @Validated(Create.class)
+    - En métodos PUT (update): @Validated(Update.class)
+    - Asegurar que todas las excepciones sean capturadas por GlobalExceptionHandler
+
+═══════════════════════════════════════════════════════════════════════════════
+FASE 2: OBSERVABILIDAD Y LOGGING ESTRUCTURADO (TASK 2)
+═══════════════════════════════════════════════════════════════════════════════
+
+2.1. CONFIGURAR logback-spring.xml
+    Archivo: src/main/resources/logback-spring.xml
+    Acción: CREAR
+    Justificación: Implementar logging estructurado con formato uniforme (TASK 2).
+                   Facilita debugging y correlación de errores con traceId.
+    Configuración:
+    - Patrón de log: timestamp | nivel | logger | traceId | mensaje
+    - Appender para consola con colores
+    - Appender para archivo (logs/application.log)
+    - Configurar niveles específicos:
+      * INFO para com.riwi.H4
+      * DEBUG para security (autenticación)
+      * WARN para org.springframework
+      * ERROR para errores críticos
+
+2.2. CREAR LoggingAspect (OPCIONAL - MEJORA)
+    Archivo: src/main/java/com/riwi/H4/infrastructure/aspect/LoggingAspect.java
+    Acción: CREAR (OPCIONAL)
+    Justificación: Logging automático de entrada/salida de métodos importantes.
+                   Mejora observabilidad sin contaminar código de negocio.
+    Funcionalidad:
+    - AOP con @Around en controllers y services
+    - Registrar: método, parámetros, tiempo de ejecución, resultado
+    - Incluir traceId en logs
+
+2.3. INTEGRAR traceId EN GlobalExceptionHandler
+    Archivo: src/main/java/com/riwi/H4/infrastructure/exception/GlobalExceptionHandler.java
+    Acción: MODIFICAR
+    Justificación: Correlacionar logs con respuestas de error usando traceId (TASK 2).
+    Cambios:
+    - Al capturar excepción, generar traceId
+    - Incluir traceId en ErrorResponse
+    - Registrar en log con formato: "Error [traceId] en [endpoint]: [detalle]"
+    - Nivel de log según tipo de error (WARN para 4xx, ERROR para 5xx)
+
+═══════════════════════════════════════════════════════════════════════════════
+FASE 3: SEGURIDAD JWT Y CONTROL DE ACCESO POR ROL (TASK 3)
+═══════════════════════════════════════════════════════════════════════════════
+
+3.1. CREAR MODELO DE DOMINIO User
+    Archivo: src/main/java/com/riwi/H4/domain/model/User.java
+    Acción: CREAR
+    Justificación: Modelo de dominio puro para representar usuarios (arquitectura hexagonal).
+    Atributos:
+    - id: Long
+    - username: String
+    - password: String (será encriptada)
+    - role: Role (enum)
+    - enabled: boolean
+    - createdAt: LocalDateTime
+
+3.2. CREAR ENUM Role
+    Archivo: src/main/java/com/riwi/H4/domain/model/Role.java
+    Acción: CREAR
+    Justificación: Definir roles del sistema para control de acceso (TASK 3).
+    Valores:
+    - ADMIN: Acceso completo a todas las operaciones
+    - USER: Acceso de solo lectura
+
+3.3. CREAR ENTIDAD UserEntity (JPA)
+    Archivo: src/main/java/com/riwi/H4/infrastructure/entity/UserEntity.java
+    Acción: CREAR
+    Justificación: Persistencia de usuarios en base de datos.
+    Configuración:
+    - @Entity con tabla "users"
+    - Campos mapeados desde User del dominio
+    - Índice único en username
+    - FetchType.EAGER para role (necesario en autenticación)
+
+3.4. CREAR UserRepositoryPort
+    Archivo: src/main/java/com/riwi/H4/application/port/out/UserRepositoryPort.java
+    Acción: CREAR
+    Justificación: Puerto de salida para persistencia de usuarios (hexagonal).
+    Métodos:
+    - Optional<User> findByUsername(String username)
+    - User save(User user)
+    - boolean existsByUsername(String username)
+
+3.5. CREAR UserJpaRepository
+    Archivo: src/main/java/com/riwi/H4/infrastructure/repository/jpa/UserJpaRepository.java
+    Acción: CREAR
+    Justificación: Repositorio JPA de Spring Data para UserEntity.
+    Métodos:
+    - Optional<UserEntity> findByUsername(String username)
+    - boolean existsByUsername(String username)
+
+3.6. CREAR UserJpaAdapter
+    Archivo: src/main/java/com/riwi/H4/infrastructure/adapter/UserJpaAdapter.java
+    Acción: CREAR
+    Justificación: Adaptador que implementa UserRepositoryPort (hexagonal).
+    Responsabilidad:
+    - Convertir entre UserEntity (infra) y User (dominio) usando mapper
+    - Delegar operaciones a UserJpaRepository
+
+3.7. CREAR UserMapper
+    Archivo: src/main/java/com/riwi/H4/infrastructure/mapper/UserMapper.java
+    Acción: CREAR
+    Justificación: Mapeo entre UserEntity y User (dominio) usando MapStruct.
+    Métodos:
+    - User toDomain(UserEntity entity)
+    - UserEntity toEntity(User domain)
+
+3.8. CREAR DTOs DE AUTENTICACIÓN
+    Archivos:
+    - src/main/java/com/riwi/H4/infrastructure/dto/auth/RegisterRequest.java
+    - src/main/java/com/riwi/H4/infrastructure/dto/auth/LoginRequest.java
+    - src/main/java/com/riwi/H4/infrastructure/dto/auth/AuthResponse.java
+    Acción: CREAR
+    Justificación: DTOs para endpoints de autenticación (TASK 3).
+    
+    RegisterRequest:
+    - username: String (validaciones: @NotBlank, @Size)
+    - password: String (@NotBlank, @Size(min=6))
+    - role: Role (@NotNull)
+    
+    LoginRequest:
+    - username: String (@NotBlank)
+    - password: String (@NotBlank)
+    
+    AuthResponse:
+    - token: String (JWT generado)
+    - username: String
+    - role: Role
+    - expiresIn: Long (milisegundos)
+
+3.9. CREAR JwtService
+    Archivo: src/main/java/com/riwi/H4/infrastructure/security/JwtService.java
+    Acción: CREAR
+    Justificación: Servicio para generación y validación de tokens JWT (TASK 3).
+    Métodos:
+    - String generateToken(UserDetails userDetails): Genera JWT
+    - String extractUsername(String token): Extrae username del token
+    - boolean validateToken(String token, UserDetails userDetails): Valida token
+    - Claims extractAllClaims(String token): Extrae claims
+    - boolean isTokenExpired(String token): Verifica expiración
+    
+    Configuración:
+    - Usar secret key de application.properties
+    - Firmar con algoritmo HS256
+    - Incluir claims: username, role, issuer, iat, exp
+
+3.10. CREAR CustomUserDetailsService
+    Archivo: src/main/java/com/riwi/H4/infrastructure/security/CustomUserDetailsService.java
+    Acción: CREAR
+    Justificación: Implementar UserDetailsService de Spring Security (TASK 3).
+                   Cargar usuarios desde BD para autenticación.
+    Funcionalidad:
+    - Implementar loadUserByUsername(String username)
+    - Usar UserRepositoryPort para obtener usuario
+    - Convertir User a UserDetails de Spring Security
+    - Lanzar UsernameNotFoundException si no existe
+
+3.11. CREAR JwtAuthenticationFilter
+    Archivo: src/main/java/com/riwi/H4/infrastructure/security/JwtAuthenticationFilter.java
+    Acción: CREAR
+    Justificación: Filtro para interceptar peticiones y validar JWT (TASK 3).
+    Funcionalidad:
+    - Extender OncePerRequestFilter
+    - Extraer token del header "Authorization: Bearer {token}"
+    - Validar token con JwtService
+    - Cargar UserDetails y establecer autenticación en SecurityContext
+    - Si token es inválido/expirado, continuar sin autenticar (devuelve 401)
+
+3.12. CREAR SecurityConfig
+    Archivo: src/main/java/com/riwi/H4/infrastructure/config/SecurityConfig.java
+    Acción: CREAR
+    Justificación: Configuración central de Spring Security con SecurityFilterChain (TASK 3).
+    Configuración:
+    - Deshabilitar CSRF (API REST stateless)
+    - Configurar CORS para permitir peticiones desde frontend
+    - Session management: STATELESS (sin sesiones)
+    - Rutas públicas: /auth/**, /h2-console/**, /swagger-ui/**, /v3/api-docs/**
+    - Rutas protegidas: /events/**, /venues/**
+    - Registrar JwtAuthenticationFilter antes de UsernamePasswordAuthenticationFilter
+    - Bean de PasswordEncoder (BCrypt)
+    - Bean de AuthenticationManager
+
+3.13. CREAR AuthenticationUseCase
+    Archivo: src/main/java/com/riwi/H4/application/port/in/AuthenticationUseCase.java
+    Acción: CREAR
+    Justificación: Puerto de entrada para casos de uso de autenticación (hexagonal).
+    Métodos:
+    - AuthResponse register(RegisterRequest request)
+    - AuthResponse login(LoginRequest request)
+
+3.14. CREAR AuthenticationServiceImpl
+    Archivo: src/main/java/com/riwi/H4/application/service/AuthenticationServiceImpl.java
+    Acción: CREAR
+    Justificación: Implementación de lógica de negocio de autenticación (TASK 3).
+    Funcionalidad:
+    
+    register(RegisterRequest):
+    - Validar que username no exista
+    - Encriptar password con PasswordEncoder
+    - Crear User del dominio
+    - Guardar con UserRepositoryPort
+    - Generar JWT
+    - Retornar AuthResponse
+    
+    login(LoginRequest):
+    - Autenticar con AuthenticationManager
+    - Cargar User desde repositorio
+    - Generar JWT
+    - Retornar AuthResponse
+    
+    Anotaciones:
+    - @Service
+    - @Transactional para registro
+
+3.15. CREAR AuthController
+    Archivo: src/main/java/com/riwi/H4/infrastructure/controller/AuthController.java
+    Acción: CREAR
+    Justificación: Endpoints REST para autenticación y registro (TASK 3).
+    Endpoints:
+    - POST /auth/register: Registro de usuario
+    - POST /auth/login: Autenticación y generación de JWT
+    
+    Validaciones:
+    - @Valid en request bodies
+    - Excepciones manejadas por GlobalExceptionHandler
+
+3.16. AGREGAR @PreAuthorize EN CONTROLADORES
+    Archivos:
+    - src/main/java/com/riwi/H4/infrastructure/controller/EventController.java
+    - src/main/java/com/riwi/H4/infrastructure/controller/VenueController.java
+    Acción: MODIFICAR
+    Justificación: Implementar control de acceso por rol (TASK 3).
+    
+    Permisos sugeridos:
+    - GET (listados, buscar): permitir a USER y ADMIN
+    - POST, PUT, DELETE: solo ADMIN
+    
+    Ejemplo:
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')") // GET
+    @PreAuthorize("hasRole('ADMIN')") // POST, PUT, DELETE
+
+3.17. HABILITAR METHOD SECURITY
+    Archivo: src/main/java/com/riwi/H4/infrastructure/config/SecurityConfig.java
+    Acción: MODIFICAR
+    Justificación: Activar @PreAuthorize para control de acceso por método.
+    Cambios:
+    - Agregar @EnableMethodSecurity(prePostEnabled = true) en clase
+
+═══════════════════════════════════════════════════════════════════════════════
+FASE 4: MIGRACIONES DE BASE DE DATOS (FLYWAY)
+═══════════════════════════════════════════════════════════════════════════════
+
+4.1. CREAR MIGRACIÓN PARA TABLA USERS
+    Archivo: src/main/resources/db/migration/V4__create_users_table.sql
+    Acción: CREAR
+    Justificación: Crear tabla users para persistir información de autenticación.
+    Script SQL:
+    - Crear tabla users (id, username, password, role, enabled, created_at)
+    - Índice único en username
+    - Constraint NOT NULL en campos obligatorios
+
+4.2. CREAR MIGRACIÓN CON DATOS SEED DE USUARIOS
+    Archivo: src/main/resources/db/migration/V5__seed_users.sql
+    Acción: CREAR
+    Justificación: Insertar usuarios de prueba para testing.
+    Datos:
+    - Usuario ADMIN: username=admin, password encriptada (BCrypt de "admin123")
+    - Usuario USER: username=user, password encriptada (BCrypt de "user123")
+    
+    Nota: Generar hash BCrypt previo a crear migración
+
+═══════════════════════════════════════════════════════════════════════════════
+FASE 5: DOCUMENTACIÓN Y TESTING
+═══════════════════════════════════════════════════════════════════════════════
+
+5.1. CREAR DOCUMENTACIÓN DE FORMATO DE ERRORES
+    Archivo: docs/error-handling.md
+    Acción: CREAR
+    Justificación: Documentar el formato RFC 7807 para consumidores del API.
+    Contenido:
+    - Explicación del formato ProblemDetail
+    - Ejemplos de respuestas de error por tipo
+    - Tabla de códigos de error comunes
+    - Uso de traceId para debugging
+
+5.2. CREAR DOCUMENTACIÓN DE SEGURIDAD
+    Archivo: docs/security-jwt.md
+    Acción: CREAR
+    Justificación: Documentar flujo de autenticación y uso de JWT.
+    Contenido:
+    - Endpoints de autenticación (/auth/register, /auth/login)
+    - Estructura del token JWT
+    - Cómo incluir JWT en peticiones (Authorization: Bearer {token})
+    - Roles y permisos del sistema
+    - Ejemplos de peticiones autenticadas
+
+5.3. ACTUALIZAR README.md
+    Archivo: README.md
+    Acción: MODIFICAR
+    Justificación: Documentar nuevas features de HU5.
+    Cambios:
+    - Actualizar título a "HU5 - Gestión de Errores y Seguridad JWT"
+    - Agregar sección de Seguridad con endpoints de autenticación
+    - Documentar formato de errores (RFC 7807)
+    - Tabla de endpoints protegidos vs públicos
+    - Instrucciones para obtener y usar JWT
+    - Ejemplos de peticiones con curl/Postman
+
+5.4. ACTUALIZAR SwaggerConfig
+    Archivo: src/main/java/com/riwi/H4/infrastructure/config/SwaggerConfig.java
+    Acción: MODIFICAR
+    Justificación: Configurar Swagger para incluir autenticación JWT.
+    Cambios:
+    - Agregar SecurityScheme para Bearer JWT
+    - Configurar header "Authorization"
+    - Marcar endpoints protegidos en documentación
+    - Actualizar información del API (título, descripción, versión)
+
+5.5. CREAR TESTS DE INTEGRACIÓN PARA AUTENTICACIÓN
+    Archivo: src/test/java/com/riwi/H4/infrastructure/controller/AuthControllerTest.java
+    Acción: CREAR
+    Justificación: Verificar funcionamiento de endpoints de autenticación.
+    Tests:
+    - testRegisterUser_Success: Registro exitoso
+    - testRegisterUser_DuplicateUsername: Error 409
+    - testLogin_Success: Login exitoso con JWT válido
+    - testLogin_InvalidCredentials: Error 401
+    - testLogin_UserNotFound: Error 404
+
+5.6. CREAR TESTS DE SEGURIDAD
+    Archivo: src/test/java/com/riwi/H4/infrastructure/security/JwtAuthenticationTest.java
+    Acción: CREAR
+    Justificación: Verificar control de acceso por rol.
+    Tests:
+    - testAccessProtectedEndpoint_WithValidToken: Acceso permitido
+    - testAccessProtectedEndpoint_WithoutToken: Error 401
+    - testAccessProtectedEndpoint_WithExpiredToken: Error 401
+    - testAccessProtectedEndpoint_WithInvalidRole: Error 403
+    - testAccessPublicEndpoint_WithoutToken: Acceso permitido
+
+5.7. CREAR TESTS DE VALIDACIÓN
+    Archivo: src/test/java/com/riwi/H4/infrastructure/validation/ValidationTest.java
+    Acción: CREAR
+    Justificación: Verificar validaciones Bean Validation y respuestas de error.
+    Tests:
+    - testCreateEvent_InvalidData: Errores de validación con formato RFC 7807
+    - testCreateEvent_MissingRequiredFields: Error 400
+    - testUpdateVenue_InvalidCapacity: Error de validación
+    - testValidationGroups: Diferentes validaciones Create vs Update
+
+═══════════════════════════════════════════════════════════════════════════════
+FASE 6: VERIFICACIÓN Y COMPILACIÓN
+═══════════════════════════════════════════════════════════════════════════════
+
+6.1. COMPILAR PROYECTO
+    Comando: mvn clean compile
+    Justificación: Verificar que no hay errores de compilación.
+    Verificar:
+    - MapStruct genera implementaciones de mappers
+    - No hay errores de dependencias
+    - Configuraciones de seguridad válidas
+
+6.2. EJECUTAR TESTS
+    Comando: mvn test
+    Justificación: Validar que todos los tests pasan correctamente.
+    Verificar:
+    - Tests de autenticación: PASS
+    - Tests de seguridad: PASS
+    - Tests de validación: PASS
+    - Coverage adecuado
+
+6.3. EJECUTAR APLICACIÓN
+    Comando: mvn spring-boot:run
+    Justificación: Verificar que la aplicación inicia sin errores.
+    Verificar:
+    - Flyway ejecuta migraciones V1-V5 correctamente
+    - No hay errores de configuración de Security
+    - H2 Console accesible
+    - Swagger UI accesible con autenticación
+
+6.4. PRUEBAS MANUALES CON POSTMAN/CURL
+    Justificación: Verificar flujo completo de autenticación y control de acceso.
+    
+    Pruebas:
+    1. POST /auth/register con datos válidos → 201 Created, retorna JWT
+    2. POST /auth/login con credenciales válidas → 200 OK, retorna JWT
+    3. POST /auth/login con credenciales inválidas → 401 Unauthorized (RFC 7807)
+    4. GET /events sin token → 401 Unauthorized
+    5. GET /events con token válido (role=USER) → 200 OK
+    6. POST /events con token valid (role=USER) → 403 Forbidden
+    7. POST /events con token válido (role=ADMIN) → 201 Created
+    8. POST /events con datos inválidos → 400 Bad Request (RFC 7807)
+    9. Verificar logs estructurados en consola (timestamp, nivel, traceId)
+    10. Verificar que traceId en respuesta de error coincide con log
+
+═══════════════════════════════════════════════════════════════════════════════
+RESUMEN DE ARCHIVOS
+═══════════════════════════════════════════════════════════════════════════════
+
+ARCHIVOS A CREAR (27):
+1. messages.properties
+2. ErrorResponse.java
+3. GlobalExceptionHandler.java
+4. ValidationGroups.java
+5. ValidDateRange.java (condicional)
+6. DateRangeValidator.java (condicional)
+7. logback-spring.xml
+8. LoggingAspect.java (opcional)
+9. User.java (domain)
+10. Role.java (domain)
+11. UserEntity.java
+12. UserRepositoryPort.java
+13. UserJpaRepository.java
+14. UserJpaAdapter.java
+15. UserMapper.java
+16. RegisterRequest.java
+17. LoginRequest.java
+18. AuthResponse.java
+19. JwtService.java
+20. CustomUserDetailsService.java
+21. JwtAuthenticationFilter.java
+22. SecurityConfig.java
+23. AuthenticationUseCase.java
+24. AuthenticationServiceImpl.java
+25. AuthController.java
+26. V4__create_users_table.sql
+27. V5__seed_users.sql
+
+DOCUMENTACIÓN (2):
+28. docs/error-handling.md
+29. docs/security-jwt.md
+
+TESTS (3):
+30. AuthControllerTest.java
+31. JwtAuthenticationTest.java
+32. ValidationTest.java
+
+ARCHIVOS A MODIFICAR (7):
+1. pom.xml (resolver conflictos, agregar dependencias)
+2. application.properties (resolver conflictos, agregar config JWT/logging)
+3. EventDTO.java (validaciones avanzadas)
+4. VenueDTO.java (validaciones)
+5. EventController.java (@PreAuthorize, @Validated)
+6. VenueController.java (@PreAuthorize, @Validated)
+7. SwaggerConfig.java (configurar JWT)
+8. README.md (documentar HU5)
+
+TOTAL: 32 archivos nuevos + 8 modificaciones = 40 cambios
+
+═══════════════════════════════════════════════════════════════════════════════
+CRITERIOS DE ACEPTACIÓN (VERIFICACIÓN)
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ TASK 1: Validaciones y Errores
+   - Respuestas de error siguen RFC 7807 (ProblemDetail)
+   - Incluyen timestamp y traceId
+   - Validaciones cruzadas activas
+   - Mensajes descriptivos desde messages.properties
+
+✅ TASK 2: Logging Estructurado
+   - Logs incluyen: timestamp, nivel, logger, traceId, mensaje
+   - Errores registrados con contexto completo
+   - TraceId correlaciona logs con respuestas de error
+   - Eventos de autenticación registrados
+
+✅ TASK 3: Seguridad JWT
+   - Autenticación funcional (/auth/register, /auth/login)
+   - JWT firmado con HS256, con expiración configurada
+   - Filtro valida JWT en cada petición
+   - Roles ADMIN y USER funcionan correctamente
+   - @PreAuthorize aplicado en endpoints
+   - Contraseñas encriptadas con BCrypt
+   - Modo stateless (sin sesiones)
+   - CORS configurado
+   - Endpoints públicos vs protegidos claramente definidos
+
+═══════════════════════════════════════════════════════════════════════════════
+NOTAS FINALES
+═══════════════════════════════════════════════════════════════════════════════
+
+- Este plan sigue la arquitectura hexagonal existente en HU4
+- Se respeta la separación domain/application/infrastructure
+- Los mappers se crean con MapStruct (consistente con proyecto actual)
+- Flyway se usa para migraciones (consistente con HU4: V1, V2, V3)
+- Se mantiene H2 como base de datos
+- El plan es secuencial: cada fase depende de la anterior
+- Estimación: 10 story points según HU5.pdf
+
+═══════════════════════════════════════════════════════════════════════════════
+FIN DEL PLAN
+═══════════════════════════════════════════════════════════════════════════════

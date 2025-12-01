@@ -16,9 +16,13 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.riwi.H4.infrastructure.validation.ValidationGroups;
+import org.springframework.validation.annotation.Validated;
+
 @RestController
 @RequestMapping("/venues")
 @Tag(name = "Venues", description = "Gestión de venues (lugares) para eventos")
+@Validated
 public class VenueController {
 
         private final VenueUseCase venueUseCase;
@@ -37,7 +41,8 @@ public class VenueController {
                         @ApiResponse(responseCode = "400", description = "Datos inválidos")
         })
         @PostMapping
-        public ResponseEntity<VenueDTO> create(@RequestBody VenueDTO venueDTO) {
+        public ResponseEntity<VenueDTO> create(
+                        @RequestBody @Validated(ValidationGroups.Create.class) VenueDTO venueDTO) {
                 Venue venue = venueDTOMapper.toDomain(venueDTO);
                 Venue createdVenue = venueUseCase.create(venue);
                 return ResponseEntity.status(HttpStatus.CREATED).body(venueDTOMapper.toDTO(createdVenue));
@@ -78,7 +83,8 @@ public class VenueController {
                         @ApiResponse(responseCode = "400", description = "Datos inválidos")
         })
         @PutMapping("/{id}")
-        public ResponseEntity<VenueDTO> update(@PathVariable Long id, @RequestBody VenueDTO venueDTO) {
+        public ResponseEntity<VenueDTO> update(@PathVariable Long id,
+                        @RequestBody @Validated(ValidationGroups.Update.class) VenueDTO venueDTO) {
                 Venue venue = venueDTOMapper.toDomain(venueDTO);
                 Venue updatedVenue = venueUseCase.update(id, venue);
                 return ResponseEntity.ok(venueDTOMapper.toDTO(updatedVenue));

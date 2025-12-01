@@ -1,8 +1,4 @@
-<<<<<<<< HEAD:src/main/java/com/riwi/H4/infrastructure/config/SwaggerConfig.java
 package com.riwi.H4.infrastructure.config;
-========
-package com.riwi.H3.infrastructure.config;
->>>>>>>> origin/main:src/main/java/com/riwi/H3/infrastructure/config/SwaggerConfig.java
 
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -16,8 +12,8 @@ public class SwaggerConfig {
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("Catálogo HU3 - Eventos y Venues")
+                        .title("Catalogo HU4 - Eventos y Venues")
                         .version("1.0")
-                        .description("API REST para gestión de eventos y venues con arquitectura hexagonal"));
+                        .description("API REST para gestion de eventos y venues con arquitectura hexagonal"));
     }
 }

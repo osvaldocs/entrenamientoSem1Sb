@@ -16,9 +16,13 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.riwi.H4.infrastructure.validation.ValidationGroups;
+import org.springframework.validation.annotation.Validated;
+
 @RestController
 @RequestMapping("/events")
 @Tag(name = "Events", description = "Gestión de eventos: CRUD completo")
+@Validated
 public class EventController {
 
         private final EventUseCase eventUseCase;
@@ -37,7 +41,8 @@ public class EventController {
                         @ApiResponse(responseCode = "400", description = "Datos inválidos")
         })
         @PostMapping
-        public ResponseEntity<EventDTO> create(@RequestBody EventDTO eventDTO) {
+        public ResponseEntity<EventDTO> create(
+                        @RequestBody @Validated(ValidationGroups.Create.class) EventDTO eventDTO) {
                 Event event = eventDTOMapper.toDomain(eventDTO);
                 Event createdEvent = eventUseCase.create(event);
                 return ResponseEntity.status(HttpStatus.CREATED).body(eventDTOMapper.toDTO(createdEvent));
@@ -78,7 +83,8 @@ public class EventController {
                         @ApiResponse(responseCode = "400", description = "Datos inválidos")
         })
         @PutMapping("/{id}")
-        public ResponseEntity<EventDTO> update(@PathVariable Long id, @RequestBody EventDTO eventDTO) {
+        public ResponseEntity<EventDTO> update(@PathVariable Long id,
+                        @RequestBody @Validated(ValidationGroups.Update.class) EventDTO eventDTO) {
                 Event event = eventDTOMapper.toDomain(eventDTO);
                 Event updatedEvent = eventUseCase.update(id, event);
                 return ResponseEntity.ok(eventDTOMapper.toDTO(updatedEvent));
