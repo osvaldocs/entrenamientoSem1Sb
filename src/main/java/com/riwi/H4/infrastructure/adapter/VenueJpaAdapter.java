@@ -22,6 +22,7 @@ public class VenueJpaAdapter implements VenueRepositoryPort {
     }
 
     @Override
+    @SuppressWarnings("null")
     public Venue save(Venue venue) {
         VenueEntity entity = mapper.toEntity(venue);
         return mapper.toModel(jpaRepository.save(entity));
@@ -29,6 +30,9 @@ public class VenueJpaAdapter implements VenueRepositoryPort {
 
     @Override
     public Optional<Venue> findById(Long id) {
+        if (id == null) {
+            return Optional.empty();
+        }
         return jpaRepository.findById(id)
                 .map(mapper::toModel);
     }
@@ -42,7 +46,9 @@ public class VenueJpaAdapter implements VenueRepositoryPort {
 
     @Override
     public void deleteById(Long id) {
-        jpaRepository.deleteById(id);
+        if (id != null) {
+            jpaRepository.deleteById(id);
+        }
     }
 
     @Override

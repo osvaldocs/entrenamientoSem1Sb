@@ -1,22 +1,33 @@
-# HU4 - Administración de Eventos y Venues
+# HU5 - Gestión Estándar de Errores y Seguridad JWT
 
 ## 📋 Descripción
 
-Sistema de gestión de eventos y venues implementado con **Arquitectura Hexagonal (Ports & Adapters)**, optimizado para persistencia de datos con JPA/Hibernate, consultas eficientes, y control transaccional avanzado.
+Este proyecto es una evolución de un sistema de gestión de eventos y venues, implementado con **Arquitectura Hexagonal (Ports & Adapters)**. Ha sido extendido para incluir un manejo de errores estandarizado siguiendo **RFC 7807** y una robusta implementación de **seguridad basada en JWT** con control de acceso por rol.
 
-Este proyecto implementa relaciones entre entidades, optimización de consultas mediante JPQL y Specifications, control de transacciones, y migraciones versionadas con Flyway.
+Se mantiene la optimización para persistencia de datos con JPA/Hibernate, consultas eficientes, y control transaccional avanzado de la HU4.
 
 ---
 
-## 🎯 Objetivos de HU4
+## ✨ Estado Actual
 
-### Optimización del Acceso y Persistencia de Datos
+La implementación de la **HU5 (Gestión Estándar de Errores y Seguridad JWT)** está **completa**. Todos los tests automáticos (unitarios y de integración) han sido verificados y pasan correctamente, asegurando la funcionalidad y robustez de la gestión de errores (RFC 7807) y el sistema de autenticación/autorización JWT. La aplicación está lista para pruebas manuales y despliegue.
 
-- **Relaciones Avanzadas JPA**: Configuración de relaciones OneToMany, ManyToOne con estrategias de carga optimizadas
-- **Consultas Eficientes**: Implementación de JPQL y Specifications para consultas dinámicas
-- **Control Transaccional**: Gestión de transacciones con `@Transactional` diferenciando lectura/escritura
-- **Migraciones Versionadas**: Scripts Flyway para sincronización de base de datos entre entornos
-- **Eliminación N+1**: Uso de `@EntityGraph` y `JOIN FETCH` para optimizar rendimiento
+---
+
+## 🎯 Objetivos de HU5
+
+### 1. Gestión Estándar de Errores
+
+*   **RFC 7807 Problem Details**: Implementación de respuestas de error estandarizadas para proporcionar detalles consistentes y útiles.
+*   **Trace ID**: Correlación de errores entre las respuestas de la API y los logs del servidor para facilitar la depuración.
+*   **Validaciones Avanzadas**: Uso de Bean Validation con grupos para validaciones específicas (creación/actualización) y mensajes personalizados.
+
+### 2. Seguridad JWT y Control de Acceso por Rol
+
+*   **Autenticación Stateless**: Uso de JWT para autenticación sin estado de sesión.
+*   **Registro y Login de Usuarios**: Endpoints dedicados para la creación de cuentas y la obtención de tokens JWT.
+*   **Control de Acceso por Rol (RBAC)**: Autorización granular de endpoints y métodos basada en roles (`ADMIN`, `USER`).
+*   **Encriptación de Contraseñas**: Almacenamiento seguro de contraseñas utilizando BCrypt.
 
 ---
 
@@ -30,7 +41,9 @@ src/main/java/com/riwi/H4
 │   ├── model/
 │   │   ├── Event.java             # Modelo de dominio - Evento
 │   │   ├── Venue.java             # Modelo de dominio - Venue
-│   │   └── EventStatus.java       # Enum de estados (ACTIVE, CANCELLED)
+│   │   ├── EventStatus.java       # Enum de estados (ACTIVE, CANCELLED)
+│   │   ├── User.java              # Modelo de dominio - Usuario (HU5)
+│   │   └── Role.java              # Enum de roles (ADMIN, USER) (HU5)
 │   └── exception/
 │       └── NotFoundException.java
 │
@@ -38,43 +51,65 @@ src/main/java/com/riwi/H4
 │   ├── port/
 │   │   ├── in/                    # Puertos de entrada
 │   │   │   ├── EventUseCase.java
-│   │   │   └── VenueUseCase.java
+│   │   │   ├── VenueUseCase.java
+│   │   │   └── AuthenticationUseCase.java # Puerto de entrada para Auth (HU5)
 │   │   └── out/                   # Puertos de salida
 │   │       ├── EventRepositoryPort.java
-│   │       └── VenueRepositoryPort.java
+│   │       ├── VenueRepositoryPort.java
+│   │       └── UserRepositoryPort.java  # Puerto de salida para User (HU5)
 │   └── service/
 │       ├── EventServiceImpl.java   # Implementación con @Transactional
-│       └── VenueServiceImpl.java   # Implementación con @Transactional
+│       ├── VenueServiceImpl.java   # Implementación con @Transactional
+│       └── AuthenticationServiceImpl.java # Implementación de Auth (HU5)
 │
 └── infrastructure/                 # Capa de Infraestructura
     ├── entity/                     # Entidades JPA
     │   ├── EventEntity.java        # @Entity con relaciones JPA
-    │   └── VenueEntity.java        # @Entity con relaciones JPA
+    │   ├── VenueEntity.java        # @Entity con relaciones JPA
+    │   └── UserEntity.java         # @Entity con relaciones JPA (HU5)
     │
     ├── repository/
     │   ├── jpa/
     │   │   ├── EventJpaRepository.java    # Consultas JPQL + @EntityGraph
-    │   │   └── VenueJpaRepository.java    # Consultas JPQL
+    │   │   ├── VenueJpaRepository.java    # Consultas JPQL
+    │   │   └── UserJpaRepository.java     # Repositorio JPA para User (HU5)
     │   └── specification/
     │       └── EventSpecification.java    # Filtros dinámicos
     │
     ├── adapter/
     │   ├── EventJpaAdapter.java    # Adaptador que implementa EventRepositoryPort
-    │   └── VenueJpaAdapter.java    # Adaptador que implementa VenueRepositoryPort
+    │   ├── VenueJpaAdapter.java    # Adaptador que implementa VenueRepositoryPort
+    │   └── UserJpaAdapter.java     # Adaptador que implementa UserRepositoryPort (HU5)
     │
     ├── mapper/                      # MapStruct mappers
     │   ├── EventMapper.java         # Entity ↔ Domain Model
     │   ├── VenueMapper.java         # Entity ↔ Domain Model
     │   ├── EventDTOMapper.java      # Domain Model ↔ DTO
-    │   └── VenueDTOMapper.java      # Domain Model ↔ DTO
+    │   ├── VenueDTOMapper.java      # Domain Model ↔ DTO
+    │   └── UserMapper.java          # Entity ↔ Domain Model (HU5)
     │
     ├── dto/
     │   ├── EventDTO.java
-    │   └── VenueDTO.java
+    │   ├── VenueDTO.java
+    │   └── auth/                    # DTOs de autenticación (HU5)
+    │       ├── RegisterRequest.java
+    │       ├── LoginRequest.java
+    │       └── AuthResponse.java
     │
-    └── controller/
-        ├── EventController.java     # REST API endpoints
-        └── VenueController.java     # REST API endpoints
+    ├── controller/
+    │   ├── EventController.java     # REST API endpoints
+    │   ├── VenueController.java     # REST API endpoints
+    │   └── AuthController.java      # REST API endpoints para Auth (HU5)
+    │
+    ├── security/                    # Clases de seguridad JWT (HU5)
+    │   ├── JwtService.java
+    │   ├── CustomUserDetailsService.java
+    │   └── JwtAuthenticationFilter.java
+    │
+    └── config/                      # Configuraciones generales
+        ├── BeanConfig.java          # Configuración de beans
+        ├── SecurityConfig.java      # Configuración de Spring Security (HU5)
+        └── SwaggerConfig.java       # Configuración de Swagger
 ```
 
 ---
@@ -107,7 +142,7 @@ private VenueEntity venue;
 
 ---
 
-## 🚀 Optimizaciones Implementadas
+## 🚀 Optimizaciones Implementadas (De HU4)
 
 ### 1. Eliminación del Problema N+1
 
@@ -169,32 +204,63 @@ public Event create(Event event) { ... }
 
 ---
 
+## 🔒 Seguridad JWT (HU5)
+
+La API implementa un esquema de seguridad basado en JWT para autenticación stateless y control de acceso basado en roles.
+
+*   **Endpoints de Autenticación**:
+    *   `POST /auth/register`: Registra un nuevo usuario y retorna un JWT.
+    *   `POST /auth/login`: Autentica un usuario existente y retorna un JWT.
+*   **Uso del Token**: El JWT obtenido debe incluirse en el encabezado `Authorization` de las peticiones a recursos protegidos: `Authorization: Bearer <TU_TOKEN_JWT>`.
+*   **Roles**: Se definen los roles `ADMIN` y `USER` con diferentes niveles de acceso.
+    *   `ADMIN`: Acceso completo (CRUD) a `/events` y `/venues`.
+    *   `USER`: Acceso de solo lectura (GET) a `/events` y `/venues`.
+
+Para una documentación detallada sobre el flujo de seguridad, roles y ejemplos, consulte: [docs/security-jwt.md](docs/security-jwt.md)
+
+---
+
+## 🚫 Manejo Estándar de Errores (RFC 7807 - HU5)
+
+La API utiliza un formato de respuesta de error estandarizado basado en [RFC 7807: Problem Details for HTTP APIs](https://tools.ietf.org/html/rfc7807). Todas las respuestas de error incluyen campos como `type`, `title`, `status`, `detail`, `instance` y un `traceId` único para depuración.
+
+Para una documentación detallada sobre el formato de errores y ejemplos, consulte: [docs/error-handling.md](docs/error-handling.md)
+
+---
+
 ## 📘 API Endpoints
 
-### Eventos
+### Autenticación (HU5)
 
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| POST | `/events` | Crear nuevo evento |
-| GET | `/events/{id}` | Obtener evento por ID |
-| GET | `/events` | Listar todos los eventos |
-| GET | `/events/paged?page=0&size=10` | Listado paginado |
-| PUT | `/events/{id}` | Actualizar evento |
-| DELETE | `/events/{id}` | Eliminar evento |
-| GET | `/events/by-venue/{venueId}` | Buscar eventos por venue |
-| GET | `/events/by-date-range?start=2025-01-01&end=2025-12-31` | Buscar por rango de fechas |
-| GET | `/events/by-status/{status}` | Filtrar por estado (ACTIVE/CANCELLED) |
+| Método | Endpoint         | Descripción                                        | Seguridad       |
+|--------|------------------|----------------------------------------------------|-----------------|
+| `POST` | `/auth/register` | Registro de nuevos usuarios.                       | `permitAll()`   |
+| `POST` | `/auth/login`    | Inicio de sesión y obtención de JWT.               | `permitAll()`   |
 
-### Venues
+### Eventos (HU4/HU5)
 
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| POST | `/venues` | Crear nuevo venue |
-| GET | `/venues/{id}` | Obtener venue por ID |
-| GET | `/venues` | Listar todos los venues |
-| GET | `/venues/paged?page=0&size=10` | Listado paginado |
-| PUT | `/venues/{id}` | Actualizar venue |
-| DELETE | `/venues/{id}` | Eliminar venue |
+| Método | Endpoint | Descripción | Seguridad |
+|--------|----------|-------------|-----------|
+| `POST` | `/events` | Crear nuevo evento | `hasRole('ADMIN')` |
+| `GET`  | `/events/{id}` | Obtener evento por ID | `hasAnyRole('ADMIN', 'USER')` |
+| `GET`  | `/events` | Listar todos los eventos | `hasAnyRole('ADMIN', 'USER')` |
+| `GET`  | `/events/paged?page=0&size=10` | Listado paginado | `hasAnyRole('ADMIN', 'USER')` |
+| `PUT`  | `/events/{id}` | Actualizar evento | `hasRole('ADMIN')` |
+| `DELETE`| `/events/{id}` | Eliminar evento | `hasRole('ADMIN')` |
+| `GET`  | `/events/by-venue/{venueId}` | Buscar eventos por venue | `hasAnyRole('ADMIN', 'USER')` |
+| `GET`  | `/events/by-date-range?start=2025-01-01&end=2025-12-31` | Buscar por rango de fechas | `hasAnyRole('ADMIN', 'USER')` |
+| `GET`  | `/events/by-status/{status}` | Filtrar por estado (ACTIVE/CANCELLED) | `hasAnyRole('ADMIN', 'USER')` |
+
+### Venues (HU4/HU5)
+
+| Método | Endpoint | Descripción | Seguridad |
+|--------|----------|-------------|-----------|
+| `POST` | `/venues` | Crear nuevo venue | `hasRole('ADMIN')` |
+| `GET`  | `/venues/{id}` | Obtener venue por ID | `hasAnyRole('ADMIN', 'USER')` |
+| `GET`  | `/venues` | Listar todos los venues | `hasAnyRole('ADMIN', 'USER')` |
+| `GET`  | `/venues/paged?page=0&size=10` | Listado paginado | `hasAnyRole('ADMIN', 'USER')` |
+| `PUT`  | `/venues/{id}` | Actualizar venue | `hasRole('ADMIN')` |
+| `DELETE`| `/venues/{id}` | Eliminar venue | `hasRole('ADMIN')` |
 
 ---
 
@@ -220,6 +286,14 @@ Datos de prueba:
 - 4 Venues (Estadio, Teatro, Auditorio, Sala de Conferencias)
 - 6 Eventos con diferentes estados y fechas
 
+### V4__create_users_table.sql (HU5)
+Creación de la tabla `users`: (id, username, password, role, enabled, created_at)
+
+### V5__seed_users.sql (HU5)
+Datos de prueba para `users`:
+- Usuario ADMIN: username=`admin`, password=`admin123`
+- Usuario USER: username=`user`, password=`user123`
+
 **Las migraciones se ejecutan automáticamente al iniciar la aplicación**
 
 ---
@@ -232,7 +306,8 @@ Datos de prueba:
 - **H2 Database** (en memoria)
 - **Flyway** (migraciones)
 - **MapStruct** (mappers automáticos)
-- **Lombok** (reducción de boilerplate)
+- **Spring Security** (HU5)
+- **JJWT** (JSON Web Tokens - HU5)
 - **SpringDoc OpenAPI** (Swagger)
 - **Maven** (gestión de dependencias)
 
@@ -265,7 +340,7 @@ http://localhost:8080/swagger-ui.html
 ```
 http://localhost:8080/h2-console
 
-JDBC URL: jdbc:h2:mem:testdb
+JDBC URL: jdbc:h2:mem:demo
 Usuario: sa
 Password: (vacío)
 ```
@@ -281,6 +356,10 @@ Password: (vacío)
 - ✅ Migraciones Flyway versionadas y reproducibles
 - ✅ Dominio limpio y desacoplado de JPA/Spring
 - ✅ Rendimiento mejorado perceptiblemente
+- ✅ **Gestión de Errores RFC 7807** con `traceId`
+- ✅ **Seguridad JWT** para autenticación stateless
+- ✅ **Control de Acceso por Rol** (`@PreAuthorize`)
+- ✅ **Registro y Login de Usuarios**
 
 ---
 
@@ -307,6 +386,8 @@ spring.jpa.properties.hibernate.format_sql=true
 
 ## 📚 Documentación Adicional
 
+- **[docs/error-handling.md](docs/error-handling.md)**: Documentación del formato estándar de errores (RFC 7807)
+- **[docs/security-jwt.md](docs/security-jwt.md)**: Documentación del flujo de seguridad JWT y control de acceso
 - **entity-lifecycle.md**: Documentación del ciclo de vida de entidades JPA
 - **transaction-propagation.md**: Explicación de propagación de transacciones
 
@@ -317,7 +398,7 @@ spring.jpa.properties.hibernate.format_sql=true
 ### Arquitectura Hexagonal
 - **Domain**: Reglas de negocio, modelos puros (sin anotaciones de frameworks)
 - **Application**: Casos de uso y orquestación
-- **Infrastructure**: Detalles técnicos (JPA, REST, DB)
+- **Infrastructure**: Detalles técnicos (JPA, REST, DB, Security)
 
 ### Dependency Rule
 Las dependencias apuntan hacia adentro:
@@ -345,12 +426,15 @@ Las dependencias apuntan hacia adentro:
 ✔️ **Datos de prueba** - Cargados automáticamente via Flyway  
 ✔️ **Optimización de queries** - Sin N+1, con índices apropiados  
 ✔️ **Control transaccional** - Rollback automático, propagación configurada  
+✔️ **Autenticación JWT** - Stateless y segura (HU5)  
+✔️ **Autorización por Roles** - Con `@PreAuthorize` (HU5)  
+✔️ **Formato de Errores RFC 7807** - Consistente y fácil de consumir (HU5)  
 
 ---
 
 ## 👤 Autor
 
-Proyecto desarrollado como parte de HU4 - Riwi
+Proyecto desarrollado como parte de HU4 y HU5 - Riwi
 
 ---
 

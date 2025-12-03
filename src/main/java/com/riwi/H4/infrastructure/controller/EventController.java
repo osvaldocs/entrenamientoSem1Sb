@@ -18,6 +18,8 @@ import java.util.stream.Collectors;
 
 import com.riwi.H4.infrastructure.validation.ValidationGroups;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.security.access.prepost.PreAuthorize;
+import jakarta.validation.Valid; // Importar la anotación @Valid de Jakarta Validation
 
 @RestController
 @RequestMapping("/events")
@@ -41,8 +43,9 @@ public class EventController {
                         @ApiResponse(responseCode = "400", description = "Datos inválidos")
         })
         @PostMapping
+        @PreAuthorize("hasRole('ADMIN')") // Solo ADMIN puede crear
         public ResponseEntity<EventDTO> create(
-                        @RequestBody @Validated(ValidationGroups.Create.class) EventDTO eventDTO) {
+                        @RequestBody @Validated(ValidationGroups.Create.class) @Valid EventDTO eventDTO) {
                 Event event = eventDTOMapper.toDomain(eventDTO);
                 Event createdEvent = eventUseCase.create(event);
                 return ResponseEntity.status(HttpStatus.CREATED).body(eventDTOMapper.toDTO(createdEvent));
@@ -56,6 +59,7 @@ public class EventController {
                         @ApiResponse(responseCode = "404", description = "Evento no encontrado")
         })
         @GetMapping("/{id}")
+        @PreAuthorize("hasAnyRole('ADMIN', 'USER')") // ADMIN y USER pueden ver
         public ResponseEntity<EventDTO> findById(@PathVariable Long id) {
                 Event event = eventUseCase.findById(id);
                 return ResponseEntity.ok(eventDTOMapper.toDTO(event));
@@ -66,6 +70,7 @@ public class EventController {
         // -----------------------------
         @Operation(summary = "Listar todos los eventos", description = "Obtiene la lista completa de eventos registrados.")
         @GetMapping
+        @PreAuthorize("hasAnyRole('ADMIN', 'USER')") // ADMIN y USER pueden ver listado
         public ResponseEntity<List<EventDTO>> findAll() {
                 List<Event> events = eventUseCase.findAll();
                 List<EventDTO> eventDTOs = events.stream()
@@ -83,8 +88,9 @@ public class EventController {
                         @ApiResponse(responseCode = "400", description = "Datos inválidos")
         })
         @PutMapping("/{id}")
+        @PreAuthorize("hasRole('ADMIN')") // Solo ADMIN puede actualizar
         public ResponseEntity<EventDTO> update(@PathVariable Long id,
-                        @RequestBody @Validated(ValidationGroups.Update.class) EventDTO eventDTO) {
+                        @RequestBody @Validated(ValidationGroups.Update.class) @Valid EventDTO eventDTO) {
                 Event event = eventDTOMapper.toDomain(eventDTO);
                 Event updatedEvent = eventUseCase.update(id, event);
                 return ResponseEntity.ok(eventDTOMapper.toDTO(updatedEvent));
@@ -98,6 +104,7 @@ public class EventController {
                         @ApiResponse(responseCode = "404", description = "Evento no encontrado")
         })
         @DeleteMapping("/{id}")
+        @PreAuthorize("hasRole('ADMIN')") // Solo ADMIN puede eliminar
         public ResponseEntity<Void> delete(@PathVariable Long id) {
                 eventUseCase.delete(id);
                 return ResponseEntity.noContent().build();

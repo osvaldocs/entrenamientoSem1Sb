@@ -23,6 +23,7 @@ public class EventJpaAdapter implements EventRepositoryPort {
     }
 
     @Override
+    @SuppressWarnings("null")
     public Event save(Event event) {
         EventEntity entity = mapper.toEntity(event);
         EventEntity saved = jpaRepository.save(entity);
@@ -31,6 +32,9 @@ public class EventJpaAdapter implements EventRepositoryPort {
 
     @Override
     public Optional<Event> findById(Long id) {
+        if (id == null) {
+            return Optional.empty();
+        }
         return jpaRepository.findById(id)
                 .map(mapper::toModel);
     }
@@ -53,7 +57,9 @@ public class EventJpaAdapter implements EventRepositoryPort {
 
     @Override
     public void deleteById(Long id) {
-        jpaRepository.deleteById(id);
+        if (id != null) {
+            jpaRepository.deleteById(id);
+        }
     }
 
     @Override

@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 
 import com.riwi.H4.infrastructure.validation.ValidationGroups;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/venues")
@@ -41,6 +42,7 @@ public class VenueController {
                         @ApiResponse(responseCode = "400", description = "Datos inválidos")
         })
         @PostMapping
+        @PreAuthorize("hasRole('ADMIN')")
         public ResponseEntity<VenueDTO> create(
                         @RequestBody @Validated(ValidationGroups.Create.class) VenueDTO venueDTO) {
                 Venue venue = venueDTOMapper.toDomain(venueDTO);
@@ -56,6 +58,7 @@ public class VenueController {
                         @ApiResponse(responseCode = "404", description = "Venue no encontrado")
         })
         @GetMapping("/{id}")
+        @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
         public ResponseEntity<VenueDTO> findById(@PathVariable Long id) {
                 Venue venue = venueUseCase.findById(id);
                 return ResponseEntity.ok(venueDTOMapper.toDTO(venue));
@@ -66,6 +69,7 @@ public class VenueController {
         // -----------------------------
         @Operation(summary = "Listar todos los venues", description = "Obtiene la lista completa de venues disponibles.")
         @GetMapping
+        @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
         public ResponseEntity<List<VenueDTO>> findAll() {
                 List<Venue> venues = venueUseCase.findAll();
                 List<VenueDTO> venueDTOs = venues.stream()
@@ -83,6 +87,7 @@ public class VenueController {
                         @ApiResponse(responseCode = "400", description = "Datos inválidos")
         })
         @PutMapping("/{id}")
+        @PreAuthorize("hasRole('ADMIN')")
         public ResponseEntity<VenueDTO> update(@PathVariable Long id,
                         @RequestBody @Validated(ValidationGroups.Update.class) VenueDTO venueDTO) {
                 Venue venue = venueDTOMapper.toDomain(venueDTO);
@@ -98,6 +103,7 @@ public class VenueController {
                         @ApiResponse(responseCode = "404", description = "Venue no encontrado")
         })
         @DeleteMapping("/{id}")
+        @PreAuthorize("hasRole('ADMIN')")
         public ResponseEntity<Void> delete(@PathVariable Long id) {
                 venueUseCase.delete(id);
                 return ResponseEntity.noContent().build();
